@@ -57,19 +57,19 @@ function Dashboard() { // Main dashboard container component
     setLoading(true);
     setMessage("");
 
-    try {
-      const [user, feedbackResult] = await Promise.all([
-        getCurrentUser(),
-        getFeedbacks({ limit: 100 }),
-      ]); // Runs API calls together
+    // try {
+    const [user, feedbackResult] = await Promise.all([
+      getCurrentUser(),
+      getFeedbacks({ limit: 100 }),
+    ]); // Runs API calls together
 
-      setCurrentUser(user);
-      setFeedbacks(feedbackResult.items || []);
-    } catch (error) {
-      setMessage(getApiErrorMessage(error, "Unable to load dashboard data."));
-    } finally {
-      setLoading(false);
-    }
+    setCurrentUser(user);
+    setFeedbacks(feedbackResult.items || []);
+    // } catch (error) {
+    //   setMessage(getApiErrorMessage(error, "Unable to load dashboard data."));
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   useEffect(() => {
