@@ -103,7 +103,7 @@ def delete_user(
     current_user=Depends(get_current_user),
 ):
     logger.info("Delete user requested by user_id=%s target_user_id=%s", current_user.id, user_id)
-    # TODO: For debug purposes, simulate a failure when the target user ID is greater than 3.
+    # TODO: FOR dedug puposes, we just hard coded the value in if condition below, later we remove it
     if user_id > 3:
         raise RuntimeError("User Id greater than")
 
