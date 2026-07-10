@@ -103,6 +103,7 @@ def delete_user(
     current_user=Depends(get_current_user),
 ):
     logger.info("Delete user requested by user_id=%s target_user_id=%s", current_user.id, user_id)
+    # TODO: FOR dedug puposes, we just hard coded the value in if condition below, later we remove it
     if(user_id > 3):  # Simulate a failure for testing purposes
         logger.error("Simulated delete user failure for target_user_id=%s", user_id)
         raise RuntimeError(f"Simulated delete user failure for target_user_id={user_id}")
