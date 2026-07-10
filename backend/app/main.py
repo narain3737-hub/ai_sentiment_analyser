@@ -1,5 +1,6 @@
 import logging
 import time
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from app.routers.feedback_router import router as feedback_router
 from app.routers.ai_router import router as ai_router
 from app.routers.dashboard_router import router as dashboard_router
 from app.routers.report_router import router as report_router
+from app.utils.incident_reporter import build_incident_payload, report_incident_async, report_incident_sync
 from app.utils.file_logger import get_backend_logger
 from app.utils.seed import seed_roles_and_admin
 
@@ -50,6 +52,12 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.perf_counter()
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    correlation_id = request.headers.get("x-correlation-id") or request_id
+
+    request.state.request_id = request_id
+    request.state.correlation_id = correlation_id
+
     request_logger.info("%s %s received", request.method, request.url.path)
 
     response = await call_next(request)
@@ -88,8 +96,22 @@ def on_startup():
         startup_logger.info("Initial seed data completed successfully")
 
         startup_logger.info("Application startup completed successfully")
-    except Exception:
+    except Exception as exc:
         startup_logger.critical("Critical startup failure", exc_info=True)
+        payload = build_incident_payload(
+            severity="CRITICAL",
+            title="Backend startup failure",
+            error_type=type(exc).__name__,
+            error_code="BACKEND_STARTUP_FAILURE",
+            error_message=str(exc),
+            url="startup://backend",
+            method="STARTUP",
+            module="backend",
+            component="startup",
+            function_name="on_startup",
+            exc=exc,
+        )
+        report_incident_sync(payload)
         raise
 
 
@@ -104,6 +126,25 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         exc.status_code,
         exc.detail,
     )
+
+    print(f"HTTPException occurred: {exc.status_code} - {exc.detail}")
+    if exc.status_code >= 500:
+        payload = build_incident_payload(
+            severity="ERROR",
+            title="Backend HTTP exception",
+            error_type=type(exc).__name__,
+            error_code=f"HTTP_{exc.status_code}",
+            error_message=str(exc.detail),
+            url=str(request.url),
+            method=request.method,
+            module="backend",
+            component=request.url.path,
+            function_name="http_exception_handler",
+            exc=exc,
+            correlation_id=getattr(request.state, "correlation_id", None),
+            request_id=getattr(request.state, "request_id", None),
+        )
+        await report_incident_async(payload)
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -134,6 +175,24 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         request.method,
         request.url.path,
     )
+    print(f"Unhandled exception occurred: {exc}")
+    exception_logger.error("Unhandled exception occurred: %s", exc)
+    payload = build_incident_payload(
+        severity="CRITICAL",
+        title="Unhandled backend exception",
+        error_type=type(exc).__name__,
+        error_code="UNHANDLED_EXCEPTION",
+        error_message=str(exc),
+        url=str(request.url),
+        method=request.method,
+        module="backend",
+        component=request.url.path,
+        function_name="unhandled_exception_handler",
+        exc=exc,
+        correlation_id=getattr(request.state, "correlation_id", None),
+        request_id=getattr(request.state, "request_id", None),
+    )
+    await report_incident_async(payload)
 
     return JSONResponse(
         status_code=500,

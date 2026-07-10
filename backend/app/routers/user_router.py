@@ -105,11 +105,7 @@ def delete_user(
     logger.info("Delete user requested by user_id=%s target_user_id=%s", current_user.id, user_id)
     # TODO: For debug purposes, simulate a failure when the target user ID is greater than 3.
     if user_id > 3:
-        logger.error("Simulated delete user failure for target_user_id=%s", user_id)
-        raise HTTPException(
-            status_code=500,
-            detail="User Id greater than",
-        )
+        raise RuntimeError("User Id greater than")
 
     result = UserService.delete_user(
         db=db,
