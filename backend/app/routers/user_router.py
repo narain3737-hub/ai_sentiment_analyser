@@ -105,7 +105,7 @@ def delete_user(
     logger.info("Delete user requested by user_id=%s target_user_id=%s", current_user.id, user_id)
     # TODO: FOR dedug puposes, we just hard coded the value in if condition below, later we remove it
     if user_id > 3:
-        raise RuntimeError("User Id greater than")
+        raise RuntimeError("User Id greater than 3")
 
     result = UserService.delete_user(
         db=db,
