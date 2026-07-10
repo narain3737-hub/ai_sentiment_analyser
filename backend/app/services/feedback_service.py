@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.models.feedback import Feedback, FeedbackAIAnalysis, FeedbackImportBatch
 from app.schemas.feedback_schema import FeedbackCreateRequest
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.feedback")
 
 
 class FeedbackService:
@@ -108,6 +112,11 @@ class FeedbackService:
         current_user,
     ):
         try:
+            logger.info(
+                "Service create_feedback started by user_id=%s customer_name=%s",
+                getattr(current_user, "id", None),
+                payload.customer_name,
+            )
             feedback_date = FeedbackService.parse_feedback_date(payload.feedback_date)
         except ValueError as error:
             raise HTTPException(
@@ -135,6 +144,12 @@ class FeedbackService:
         db.commit()
         db.refresh(feedback)
 
+        logger.info(
+            "Service create_feedback completed by user_id=%s feedback_id=%s",
+            getattr(current_user, "id", None),
+            feedback.id,
+        )
+
         return FeedbackService.serialize_feedback(feedback)
 
     # Parse CSV text from pasted content
@@ -151,6 +166,11 @@ class FeedbackService:
             )
 
         reader = csv.DictReader(io.StringIO(csv_text.strip()))
+
+        logger.info(
+            "Service import_feedback_from_csv_text started by user_id=%s",
+            getattr(current_user, "id", None),
+        )
 
         return FeedbackService.process_csv_rows(
             db=db,
@@ -184,6 +204,12 @@ class FeedbackService:
             )
 
         reader = csv.DictReader(io.StringIO(decoded_content))
+
+        logger.info(
+            "Service import_feedback_from_csv_file started by user_id=%s filename=%s",
+            getattr(current_user, "id", None),
+            file.filename,
+        )
 
         return FeedbackService.process_csv_rows(
             db=db,
@@ -227,6 +253,13 @@ class FeedbackService:
 
         db.add(import_batch)
         db.flush()
+
+        logger.info(
+            "Service process_csv_rows started by user_id=%s source=%s total_rows=%s",
+            getattr(current_user, "id", None),
+            source,
+            len(normalized_rows),
+        )
 
         success_count = 0
         failed_count = 0
@@ -293,6 +326,14 @@ class FeedbackService:
 
         db.commit()
 
+        logger.info(
+            "Service process_csv_rows completed by user_id=%s source=%s success=%s failed=%s",
+            getattr(current_user, "id", None),
+            source,
+            success_count,
+            failed_count,
+        )
+
         return {
             "total_records": len(normalized_rows),
             "success_count": success_count,
@@ -304,6 +345,7 @@ class FeedbackService:
     @staticmethod
     def create_basic_ai_analysis(db: Session, feedback: Feedback):
         text = feedback.feedback_text.lower()
+        logger.info("Service create_basic_ai_analysis started for feedback_id=%s", feedback.id)
 
         # Determine sentiment by checking for positive/negative keywords
         positive_words = [
@@ -413,6 +455,13 @@ class FeedbackService:
 
         db.add(analysis)
         db.flush()
+
+        logger.info(
+            "Service create_basic_ai_analysis completed for feedback_id=%s sentiment=%s theme=%s",
+            feedback.id,
+            sentiment,
+            theme,
+        )
 
     @staticmethod
     def serialize_feedback(feedback: Feedback):

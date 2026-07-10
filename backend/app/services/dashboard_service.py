@@ -2,12 +2,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 
 from app.models.feedback import Feedback, FeedbackAIAnalysis
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.dashboard")
 
 
 class DashboardService:
     # Generate dashboard with sentiment counts and theme breakdown
     @staticmethod
     def get_sentiment_dashboard(db: Session):
+        logger.info("Service get_sentiment_dashboard started")
         # Count total feedback records
         total_feedback = db.query(Feedback).count()
 

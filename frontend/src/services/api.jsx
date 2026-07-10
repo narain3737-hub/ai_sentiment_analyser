@@ -3,6 +3,8 @@ import {
   mapBackendRoleToFrontend,
   mapFrontendRoleToBackend,
 } from "../utils/roleConfig.js"; // Role mapping shared with roleConfig — single source of truth
+import { reportIncident } from "../monitoring/incidentReporter";
+import { severityForHttpFailure } from "../monitoring/severity";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"; // Uses env API URL or local backend
@@ -14,6 +16,36 @@ const api = axios.create({ // Creates reusable Axios instance
     "Content-Type": "application/json",
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.log("error========>", error)
+    const status = error.response?.status;
+    const severity = severityForHttpFailure(status, error.code);
+
+    void reportIncident({
+      title: `API Request Failed (${error.config?.method?.toUpperCase()} ${error.config?.url})`,
+      severity: severity,
+      error_type: error.name || "AxiosError",
+      error_code: `HTTP_ERROR_${status || error.code || "UNKNOWN"}`,
+      error_message: error.message || "API request encountered an error",
+      stacktrace: error.stack || "",
+      module: "frontend-api",
+      component: "AxiosInstance",
+      function_name: `${error.config?.method?.toLowerCase()}Request`,
+      url: window.location.href,
+      metadata: {
+        status: status,
+        url: error.config?.url,
+        method: error.config?.method,
+        response_data: error.response?.data,
+      },
+    });
+
+    return Promise.reject(error);
+  }
+);
 
 
 function getResponseData(response) { // Extracts actual API data from response
@@ -217,7 +249,7 @@ export async function logoutUser() { // Logs out current user
 }
 
 export async function createFeedback(payload) { // Creates a new feedback record
-  const response = await api.post("/feedback", {
+  const response = await api.post("/feedback-not-existent", {
     customer_name: payload.customerName,
     channel: payload.channel,
     rating: toNumberOrNull(payload.rating),

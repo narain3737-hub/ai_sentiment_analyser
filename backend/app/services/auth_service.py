@@ -3,12 +3,17 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.core.security import verify_password, create_access_token
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.auth")
 
 
 class AuthService:
     # Authenticate user with email and password, return JWT token
     @staticmethod
     def login(db: Session, email: str, password: str):
+        logger.info("Service login started for email=%s", email)
         # Query user by email from database
         user = db.query(User).filter(User.email == email).first()
 
@@ -43,6 +48,7 @@ class AuthService:
         )
 
         # Return JWT token and user information
+        logger.info("Service login completed for user_id=%s email=%s", user.id, user.email)
         return {
             "access_token": access_token,
             "token_type": "bearer",

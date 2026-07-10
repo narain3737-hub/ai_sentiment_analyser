@@ -1,4 +1,7 @@
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings
+
+from app.utils.file_logger import get_backend_logger
 
 # Application settings loaded from environment variables
 class Settings(BaseSettings):
@@ -14,5 +17,10 @@ class Settings(BaseSettings):
         env_file = ".env"
         extra = "ignore"
 
-# Initialize global settings instance
-settings = Settings()
+try:
+    # Initialize global settings instance
+    settings = Settings()
+except ValidationError as exc:
+    logger = get_backend_logger("startup.config")
+    logger.critical("Invalid backend configuration: %s", exc, exc_info=True)
+    raise

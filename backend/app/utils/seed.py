@@ -90,6 +90,7 @@ def seed_default_users(db: Session):
         db.add(admin_user)
     else:
         admin_user.role_id = admin_role.id
+        admin_user.password_hash = hash_password("admin123")
 
     # Create/update Product Analyst User
     analyst_user = db.query(User).filter(User.email == "analyst@example.com").first()
@@ -104,6 +105,7 @@ def seed_default_users(db: Session):
         db.add(analyst_user)
     else:
         analyst_user.role_id = analyst_role.id
+        analyst_user.password_hash = hash_password("analyst123")
 
     # Create/update Support Lead User
     support_user = db.query(User).filter(User.email == "support@example.com").first()
@@ -118,5 +120,19 @@ def seed_default_users(db: Session):
         db.add(support_user)
     else:
         support_user.role_id = support_role.id
+        support_user.password_hash = hash_password("support123")
 
     db.commit()
+
+
+if __name__ == "__main__":
+    from app.core.database import SessionLocal
+    print("Seeding database...")
+    db = SessionLocal()
+    try:
+        seed_roles_and_admin(db)
+        print("Database seeded successfully!")
+    except Exception as e:
+        print(f"Error seeding database: {e}")
+    finally:
+        db.close()

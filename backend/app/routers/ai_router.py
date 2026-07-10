@@ -9,10 +9,12 @@ from app.schemas.feedback_schema import (
     FeedbackResponse,
 )
 from app.services.ai_service import AIService
+from app.utils.file_logger import get_backend_logger
 from app.utils.response import success_response
 
 # AI analysis routes for feedback processing
 router = APIRouter(prefix="/ai", tags=["AI Analysis"])
+logger = get_backend_logger("ai")
 
 
 # Helper to retrieve feedback with AI analysis data loaded via repository
@@ -38,10 +40,21 @@ def analyze_feedback(
     current_user=Depends(get_current_user),
 ):
     ensure_admin(current_user)
+    logger.info(
+        "AI analyze-feedback requested by user_id=%s feedback_id=%s",
+        current_user.id,
+        payload.feedback_id,
+    )
 
     analysis = AIService.analyze_feedback(
         db=db,
         feedback_id=payload.feedback_id,
+    )
+
+    logger.info(
+        "AI analyze-feedback completed by user_id=%s feedback_id=%s",
+        current_user.id,
+        payload.feedback_id,
     )
 
     return success_response(
@@ -58,6 +71,11 @@ def reanalyze_feedback(
     current_user=Depends(get_current_user),
 ):
     ensure_admin(current_user)
+    logger.info(
+        "AI reanalyze requested by user_id=%s feedback_id=%s",
+        current_user.id,
+        feedback_id,
+    )
 
     AIService.analyze_feedback(
         db=db,
@@ -69,6 +87,12 @@ def reanalyze_feedback(
     feedback = get_feedback_with_ai_analysis(
         db=db,
         feedback_id=feedback_id,
+    )
+
+    logger.info(
+        "AI reanalyze completed by user_id=%s feedback_id=%s",
+        current_user.id,
+        feedback_id,
     )
 
     return success_response(

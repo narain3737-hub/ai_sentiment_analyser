@@ -2,12 +2,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case
 
 from app.models.feedback import Feedback, FeedbackAIAnalysis
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.reports")
 
 
 class ReportService:
     # Generate monthly report with sentiment, theme, and resolution metrics
     @staticmethod
     def get_monthly_report(db: Session):
+        logger.info("Service get_monthly_report started")
         # Query feedback grouped by month with total count and resolved count
         month_rows = (
             db.query(
@@ -85,4 +90,5 @@ class ReportService:
                 }
             )
 
+        logger.info("Service get_monthly_report completed with rows=%s", len(report))
         return report

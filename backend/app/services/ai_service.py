@@ -5,6 +5,10 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from app.models.feedback import Feedback, FeedbackAIAnalysis
 from app.schemas.feedback_schema import ALLOWED_SENTIMENTS, ALLOWED_THEMES
 from app.services.gemini_ai_service import GeminiAIService
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.ai")
 
 
 class AIService:
@@ -259,6 +263,7 @@ class AIService:
     # Build analysis using VADER fallback when Gemini API fails
     @staticmethod
     def build_fallback_analysis(feedback: Feedback) -> dict:
+        logger.info("Service build_fallback_analysis started for feedback_id=%s", feedback.id)
         sentiment, confidence_score = AIService.detect_sentiment(
             feedback_text=feedback.feedback_text,
             rating=feedback.rating,
@@ -300,6 +305,7 @@ class AIService:
     @staticmethod
     def build_analysis(feedback: Feedback) -> dict:
         try:
+            logger.info("Service build_analysis started for feedback_id=%s", feedback.id)
             # Try Gemini AI analysis first
             analysis = GeminiAIService().analyze_feedback(
                 feedback_text=feedback.feedback_text,
@@ -323,12 +329,17 @@ class AIService:
 
         except Exception as error:
             # Fall back to VADER if Gemini fails
-            print("Gemini failed, using VADER fallback:", error)
+            logger.error(
+                "Gemini analysis failed for feedback_id=%s; using fallback: %s",
+                feedback.id,
+                error,
+            )
             return AIService.build_fallback_analysis(feedback)
 
     # Main entry point: analyze feedback and save AI analysis
     @staticmethod
     def analyze_feedback(db: Session, feedback_id: int):
+        logger.info("Service analyze_feedback started for feedback_id=%s", feedback_id)
         feedback = db.query(Feedback).filter(Feedback.id == feedback_id).first()
 
         if not feedback:
@@ -359,5 +370,7 @@ class AIService:
 
         db.commit()
         db.refresh(ai_analysis)
+
+        logger.info("Service analyze_feedback completed for feedback_id=%s", feedback_id)
 
         return ai_analysis

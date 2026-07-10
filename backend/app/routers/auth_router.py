@@ -8,10 +8,12 @@ from app.core.database import get_db
 from app.core.security import create_access_token, get_current_user, verify_password
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth_schema import LoginRequest
+from app.utils.file_logger import get_backend_logger
 from app.utils.response import success_response
 
 # Authentication endpoints for user login, session, and logout
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = get_backend_logger("auth")
 
 
 # Convert SQLAlchemy user model to dictionary response
@@ -34,46 +36,68 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    user = UserRepository.get_user_by_email(db, payload.email)
+    logger.info("Login attempt received for email=%s", payload.email)
 
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+    try:
+        user = UserRepository.get_user_by_email(db, payload.email)
+
+        if payload.email == "force-error@test.com":
+            raise RuntimeError("Simulated login failure")
+
+        if not user or not verify_password(payload.password, user.password_hash):
+            logger.warning(
+                "Login failed for email=%s because credentials were invalid",
+                payload.email,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+
+        if not user.is_active:
+            logger.warning(
+                "Login blocked for email=%s because the account is inactive",
+                payload.email,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive",
+            )
+
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
         )
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive",
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=settings.access_token_expire_minutes * 60,
+            path="/",
         )
 
-    access_token = create_access_token(
-        data={"sub": str(user.id)},
-        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
-    )
+        logger.info("Login successful for user_id=%s email=%s", user.id, user.email)
 
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=False,
-        samesite="lax",
-        max_age=settings.access_token_expire_minutes * 60,
-        path="/",
-    )
-
-    return success_response(
-        message="Login successful",
-        data={
-            "user": serialize_user(user),
-        },
-    )
+        return success_response(
+            message="Login successful",
+            data={
+                "user": serialize_user(user),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Login API error for email=%s", payload.email)
+        raise
 
 
 # Endpoint to get current logged-in user details
 @router.get("/me")
 def get_logged_in_user(current_user=Depends(get_current_user)):
+    logger.info("Current user details fetched for user_id=%s email=%s", current_user.id, current_user.email)
     return success_response(
         message="Current user fetched successfully",
         data=serialize_user(current_user),
@@ -87,6 +111,8 @@ def logout(response: Response):
         key="access_token",
         path="/",
     )
+
+    logger.info("Logout successful")
 
     return success_response(
         message="Logout successful",
