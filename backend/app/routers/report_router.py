@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.utils.file_logger import get_backend_logger
 from app.utils.response import success_response
 
 # Monthly report endpoints for aggregating feedback metrics and insights
 router = APIRouter(prefix="/reports", tags=["Reports"])
+logger = get_backend_logger("reports")
 
 
 # Endpoint to retrieve monthly report with feedback aggregation and sentiment analysis
@@ -21,6 +23,7 @@ def get_monthly_report(
     current_user=Depends(get_current_user),
 ):
     today = date.today()
+    urgency_counter = Counter()
 
     # Use provided month/year or default to current date
     selected_month = month or today.month
@@ -28,6 +31,12 @@ def get_monthly_report(
 
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info(
+        "Monthly report requested by user_id=%s month=%s year=%s",
+        current_user.id,
+        selected_month,
+        selected_year,
+    )
     # Query feedbacks for selected month with AI analysis data via repository
     feedbacks = FeedbackRepository.get_monthly_report_feedbacks(
         db=db,
@@ -174,6 +183,14 @@ def get_monthly_report(
         "monthly_insight": monthly_insight,
         "monthlyInsight": monthly_insight,
     }
+
+    logger.info(
+        "Monthly report completed by user_id=%s month=%s year=%s total_feedback=%s",
+        current_user.id,
+        selected_month,
+        selected_year,
+        total_feedback,
+    )
 
     return success_response(
         message="Monthly report fetched successfully",

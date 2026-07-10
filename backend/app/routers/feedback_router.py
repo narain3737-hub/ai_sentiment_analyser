@@ -13,10 +13,12 @@ from app.schemas.feedback_schema import (
     FeedbackResponse,
     FeedbackStatusUpdateRequest,
 )
+from app.utils.file_logger import get_backend_logger
 from app.utils.response import success_response
 
 # Feedback CRUD endpoints for creating, listing, filtering, updating, and deleting feedback
 router = APIRouter(prefix="/feedback", tags=["Feedback"])
+logger = get_backend_logger("feedback")
 
 
 # Endpoint to create new feedback and generate AI analysis
@@ -27,6 +29,7 @@ def create_feedback(
     current_user=Depends(get_current_user),
 ):
     ensure_roles(current_user, ["Admin", "Product Analyst"])
+    logger.info("Create feedback requested by user_id=%s customer_name=%s", current_user.id, payload.customer_name)
 
     from app.services.feedback_service import FeedbackService
 
@@ -35,6 +38,8 @@ def create_feedback(
         payload=payload,
         current_user=current_user,
     )
+
+    logger.info("Feedback created by user_id=%s customer_name=%s", current_user.id, payload.customer_name)
 
     return success_response(
         message="Feedback created successfully",
@@ -56,6 +61,16 @@ def get_feedbacks(
 ):
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info(
+        "List feedback requested by user_id=%s search=%s status=%s sentiment=%s theme=%s page=%s limit=%s",
+        current_user.id,
+        search,
+        status_filter,
+        sentiment,
+        theme,
+        page,
+        limit,
+    )
     items, total = FeedbackRepository.list_feedbacks_active(
         db=db,
         search=search,
@@ -73,6 +88,8 @@ def get_feedbacks(
         limit=limit,
     )
 
+    logger.info("List feedback completed by user_id=%s total=%s", current_user.id, total)
+
     return success_response(
         message="Feedback records fetched successfully",
         data=response,
@@ -88,6 +105,7 @@ def get_feedback_by_id(
 ):
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info("Get feedback requested by user_id=%s feedback_id=%s", current_user.id, feedback_id)
     feedback = FeedbackRepository.get_feedback_by_id_active(db, feedback_id)
 
     if not feedback:
@@ -114,6 +132,12 @@ def update_feedback_status(
 
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info(
+        "Update feedback status requested by user_id=%s feedback_id=%s status=%s",
+        current_user.id,
+        feedback_id,
+        payload.status,
+    )
     feedback = FeedbackRepository.get_feedback_by_id_active(db, feedback_id)
 
     if not feedback:
@@ -123,6 +147,13 @@ def update_feedback_status(
         )
 
     FeedbackRepository.update_status_simple(db, feedback, payload.status)
+
+    logger.info(
+        "Feedback status updated by user_id=%s feedback_id=%s status=%s",
+        current_user.id,
+        feedback_id,
+        payload.status,
+    )
 
     return success_response(
         message="Feedback status updated successfully",
@@ -142,6 +173,12 @@ def assign_feedback_team(
 
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info(
+        "Assign feedback requested by user_id=%s feedback_id=%s team=%s",
+        current_user.id,
+        feedback_id,
+        payload.assigned_team,
+    )
     feedback = FeedbackRepository.get_feedback_by_id_active(db, feedback_id)
 
     if not feedback:
@@ -151,6 +188,13 @@ def assign_feedback_team(
         )
 
     FeedbackRepository.assign_team(db, feedback, payload.assigned_team)
+
+    logger.info(
+        "Feedback assigned by user_id=%s feedback_id=%s team=%s",
+        current_user.id,
+        feedback_id,
+        payload.assigned_team,
+    )
 
     return success_response(
         message="Feedback assigned successfully",
@@ -169,6 +213,7 @@ def delete_feedback(
 
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info("Delete feedback requested by user_id=%s feedback_id=%s", current_user.id, feedback_id)
     feedback = FeedbackRepository.get_feedback_by_id_active(db, feedback_id)
 
     if not feedback:
@@ -178,6 +223,8 @@ def delete_feedback(
         )
 
     FeedbackRepository.soft_delete_feedback(db, feedback)
+
+    logger.info("Feedback deleted by user_id=%s feedback_id=%s", current_user.id, feedback_id)
 
     return success_response(
         message="Feedback deleted successfully",
@@ -193,6 +240,7 @@ async def import_feedback_csv(
     current_user=Depends(get_current_user),
 ):
     ensure_roles(current_user, ["Admin", "Product Analyst"])
+    logger.info("CSV import requested by user_id=%s filename=%s", current_user.id, file.filename)
 
     from app.services.feedback_service import FeedbackService
 
@@ -200,6 +248,14 @@ async def import_feedback_csv(
         db=db,
         file=file,
         current_user=current_user,
+    )
+
+    logger.info(
+        "CSV import completed by user_id=%s filename=%s success=%s failed=%s",
+        current_user.id,
+        file.filename,
+        result.get("success_count"),
+        result.get("failed_count"),
     )
 
     return success_response(

@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.utils.file_logger import get_backend_logger
 from app.utils.response import success_response
 
 # Dashboard analytics endpoints for sentiment and feedback metrics
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+logger = get_backend_logger("dashboard")
 
 
 # Endpoint to retrieve sentiment analytics, status breakdown, themes, and recent feedback
@@ -19,6 +21,7 @@ def get_dashboard_sentiment(
 ):
     from app.repositories.feedback_repository import FeedbackRepository
 
+    logger.info("Dashboard sentiment requested by user_id=%s", current_user.id)
     feedbacks = FeedbackRepository.get_dashboard_feedbacks(db)
 
     # Count sentiment, status, theme, and assignment distribution
@@ -121,6 +124,12 @@ def get_dashboard_sentiment(
         "monthly_insight": monthly_insight,
         "monthlyInsight": monthly_insight,
     }
+
+    logger.info(
+        "Dashboard sentiment completed by user_id=%s total_feedback=%s",
+        current_user.id,
+        total_feedback,
+    )
 
     return success_response(
         message="Dashboard analytics fetched successfully",

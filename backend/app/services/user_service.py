@@ -4,6 +4,10 @@ from sqlalchemy.orm import Session
 from app.core.security import ensure_admin, hash_password
 from app.models.user import Role, User
 from app.schemas.user_schema import UserCreateRequest, UserUpdateRequest
+from app.utils.file_logger import get_backend_logger
+
+
+logger = get_backend_logger("service.users")
 
 
 class UserService:
@@ -17,6 +21,13 @@ class UserService:
         limit: int | None = None,
     ):
         ensure_admin(current_user)
+        logger.info(
+            "Service list_users started by user_id=%s search=%s role=%s limit=%s",
+            current_user.id,
+            search,
+            role,
+            limit,
+        )
 
         # Query active users joined with their role information
         query = (
@@ -43,6 +54,12 @@ class UserService:
 
         users = query.all()
 
+        logger.info(
+            "Service list_users completed by user_id=%s total=%s",
+            current_user.id,
+            total,
+        )
+
         return {
             "items": [UserService._serialize_user(user) for user in users],
             "total": total,
@@ -56,6 +73,12 @@ class UserService:
         current_user,
     ):
         ensure_admin(current_user)
+        logger.info(
+            "Service create_user started by user_id=%s email=%s role=%s",
+            current_user.id,
+            payload.email,
+            payload.role,
+        )
 
         email = payload.email.strip().lower()
 
@@ -87,6 +110,12 @@ class UserService:
             db.commit()
             db.refresh(existing_user)
 
+            logger.info(
+                "Service create_user reactivated user_id=%s email=%s",
+                existing_user.id,
+                existing_user.email,
+            )
+
             return UserService._serialize_user(existing_user)
 
         user = User(
@@ -101,6 +130,13 @@ class UserService:
         db.commit()
         db.refresh(user)
 
+        logger.info(
+            "Service create_user completed by user_id=%s new_user_id=%s email=%s",
+            current_user.id,
+            user.id,
+            user.email,
+        )
+
         return UserService._serialize_user(user)
 
     # Update user details, email, password and role
@@ -112,6 +148,11 @@ class UserService:
         current_user,
     ):
         ensure_admin(current_user)
+        logger.info(
+            "Service update_user started by user_id=%s target_user_id=%s",
+            current_user.id,
+            user_id,
+        )
 
         user = (
             db.query(User)
@@ -163,6 +204,12 @@ class UserService:
         db.commit()
         db.refresh(user)
 
+        logger.info(
+            "Service update_user completed by user_id=%s target_user_id=%s",
+            current_user.id,
+            user_id,
+        )
+
         return UserService._serialize_user(user)
 
     # Soft delete user by marking is_active as False
@@ -173,6 +220,11 @@ class UserService:
         current_user,
     ):
         ensure_admin(current_user)
+        logger.info(
+            "Service delete_user started by user_id=%s target_user_id=%s",
+            current_user.id,
+            user_id,
+        )
 
         # Prevent user from deleting their own account
         if current_user.id == user_id:
@@ -197,6 +249,12 @@ class UserService:
 
         db.commit()
         db.refresh(user)
+
+        logger.info(
+            "Service delete_user completed by user_id=%s target_user_id=%s",
+            current_user.id,
+            user_id,
+        )
 
         return {
             "deleted": True,
